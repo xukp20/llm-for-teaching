@@ -88,3 +88,15 @@ def split(ref_answer_file, grading_file):
     split_result = match_problems(problem_list, grading_rules_list)
 
     return split_result
+
+
+def split_only_problem(student_ans_file):
+    """
+        Split the student answer file into separated problems.
+    """
+    with open(student_ans_file, "r") as f:
+        student_ans = f.read()
+
+    problem_list = split_raw_text(student_ans)
+
+    return problem_list
