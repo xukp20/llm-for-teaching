@@ -112,6 +112,7 @@ def group_scores(agg_scores, new_score, rule):
     return agg_scores
 
 
+from tqdm import tqdm
 def check_one_problem(ref_problem, student_problem, rules, app_key):
     """
         Check one problem with multiple rules.
@@ -135,15 +136,14 @@ def check_one_problem(ref_problem, student_problem, rules, app_key):
     all_reasons = []
     agg_scores = {}
 
-    for rule_id, table in enumerate(tables):
+    for rule_id, table in tqdm(enumerate(tables), desc="Rules", total=len(tables)):
         max_score = rules[rule_id]["score"]
         rule_id = rule_id + 1
         process, scores = check_one_rule(ref_problem, student_problem, table, app_key)
         # check validity
         if len(scores) != 1:
-            print("Error: scores should have length 1")
+            print("Warning: scores should have length 1")
             print(scores)
-            continue
         if not str(rule_id) in scores:
             print("Error: rule_id not in scores")
             print(rule_id)
@@ -169,8 +169,7 @@ def check_one_problem(ref_problem, student_problem, rules, app_key):
     return records
 
 
-def match_problems(parsed_problem_list, split_result):
-    ref_problems = {problem["id"]: problem for problem in parsed_problem_list}
+def match_problems(ref_problems, split_result):
     check_pairs = [
         {
             "id": problem[0],
@@ -179,17 +178,49 @@ def match_problems(parsed_problem_list, split_result):
         }
         for problem in split_result
     ]
+    # look for missing problems
+    missing_ids = set(ref_problems.keys()) - set([pair["id"] for pair in check_pairs])
 
-    return check_pairs
+    return check_pairs, missing_ids
 
 def get_all_problem_ids(parsed_problem_list):
     return list(set([problem["id"] for problem in parsed_problem_list]))
 
+def get_missing_problem_results(ref_problem):
+    """
+        Generate an empty record for the missing problem.
+    """
+    all_scores = []
+    all_reasons = []
+    agg_scores = {}
+
+    records = {
+        "ref": ref_problem["problem"],
+        "student": "Missing!",
+        "rules": ref_problem["rules"],
+    }
+
+    for rule in ref_problem["rules"]:
+        process = "Missing answer"
+        score = 0
+        all_scores.append(score)
+        all_reasons.append(process)
+        agg_scores = group_scores(agg_scores, score, rule)
+
+    records["scores"] = all_scores
+    records["reasons"] = all_reasons
+    records["agg_scores"] = {rule_id: sum(scores) for rule_id, scores in agg_scores.items()}
+
+    return records
+
+
 def check(refs_path, student_ans_file, app_key):
     parsed_problem_list = ParsedProblemList.from_file(refs_path).to_dict()
+    ref_problems = {problem["id"]: problem for problem in parsed_problem_list}
+    
     split_result = split_only_problem(student_ans_file)
 
-    check_pairs = match_problems(parsed_problem_list, split_result)
+    check_pairs, missing_ids = match_problems(ref_problems, split_result)
 
     all_records = {}
     for pair in check_pairs:
@@ -197,6 +228,14 @@ def check(refs_path, student_ans_file, app_key):
         records = check_one_problem(pair["ref"]["problem"], pair["student"], pair["ref"]["rules"], app_key)
 
         all_records[id] = records
+
+    for id in missing_ids:
+        ref_problem = ref_problems[id]
+        records = get_missing_problem_results(ref_problem)
+        all_records[id] = records
+
+    # sort by id
+    all_records = dict(sorted(all_records.items(), key=lambda x: x[0]))
 
     return all_records
 
@@ -206,14 +245,19 @@ def print_one_problem_record(records):
     """
         Print the record in a human-readable way.
     """
-    string = ""
-    string += f"### Ref\n{records['ref']}\n"
-    string += f"### Student\n{records['student']}\n"
-    string += f"### Rules\n"
-    string += format_rules_table_with_scores(records["rules"], records["scores"], records["reasons"])
-    string += f"### Agg Scores\n"
-    string += format_subproblem_table(records["agg_scores"])
+    try:
+        string = ""
+        string += f"### Ref\n{records['ref']}\n"
+        string += f"### Student\n{records['student']}\n\n"
+        string += f"### Rules\n"
+        string += format_rules_table_with_scores(records["rules"], records["scores"], records["reasons"])
+        string += f"### Agg Scores\n"
+        string += format_subproblem_table(records["agg_scores"])
+    except Exception as e:
+        print(e)
+        print(records)
     
+    # remove 
     return string
 
 
@@ -240,3 +284,52 @@ def print_all_records_with_ref_scores(all_records, ref_scores):
         string += format_subproblem_table(ref_scores[id])
         string += "\n"
     return string
+
+
+# high level entry
+from src.utils.files import find_student_files
+from src.utils.paths import FilePaths, save_json, read_json, save_text
+import os
+from tqdm import tqdm
+
+def batch_check(
+        hw_id,
+        check_key):
+    """
+        Check all the student answers in the raw_answer_dir.
+    
+        1. Find all student files
+        2. Use `check` to check each
+        3. Look for scores file in the data dir, if so, add to the report
+        4. Save the reports to the reports_dir
+    """
+    raw_answer_dir = FilePaths.get_raw_answers_path(hw_id)
+    parsed_problems_file = FilePaths.get_parsed_problems_file(hw_id)
+    ref_scores_file = FilePaths.get_ref_scores_file(hw_id)
+    results_dir = FilePaths.get_results_path(hw_id)
+
+    student_files = find_student_files(raw_answer_dir)
+    ref_scores = {}
+    if os.path.exists(ref_scores_file):
+        ref_scores = read_json(ref_scores_file)
+
+    for student_name in tqdm(student_files, desc="Checking", total=len(student_files)):
+        # check report exists
+        if os.path.exists(os.path.join(results_dir, f"{student_name}.json")):
+            tqdm.write(f"Report for {student_name} exists, skip.")
+            continue
+
+        student_ans_file = student_files[student_name]
+        student_records = check(parsed_problems_file, student_ans_file, check_key)
+        if student_name in ref_scores:
+            report = print_all_records_with_ref_scores(student_records, ref_scores[student_name])
+        else:
+            report = print_all_records(student_records)
+        
+        # save json
+        json_report_file = os.path.join(results_dir, f"{student_name}.json")
+        save_json(json_report_file, student_records)
+
+        # save
+        md_report_file = os.path.join(results_dir, f"{student_name}.md")
+        save_text(md_report_file, report)

@@ -1,34 +1,25 @@
-from src.preprocess.split import split_only_problem
+from src.utils.paths import FilePaths, KeyPaths, read_key
 
-import os, json
-base_path = "data/1"
-refs_path = os.path.join(base_path, "refs")
-mids_path = os.path.join(base_path, "mids")
-grading_file = os.path.join(refs_path, "grading_rules.md")
-ref_answer_file = os.path.join(refs_path, "ref_answer.md")
+import os
 
-student_ans_dir = os.path.join(base_path, "raw_answers")
-student_file = "主观题 HW1.md"
+mids_path = FilePaths.get_mids_path("1")
+ref_answer_file = FilePaths.get_ref_answer_file("1")
+grading_file = FilePaths.get_grading_rules_file("1")
+
+student_file = "2022011095_周赫_2893.zip"
 
 # set the student file
-student_ans_file = os.path.join(student_ans_dir, student_file)
+student_ans_file = os.path.join(FilePaths.get_raw_answers_path("1"), student_file)
 
 # load the grading rules
-parsed_path = os.path.join(mids_path, "problems.json")
+parsed_path = FilePaths.get_parsed_problems_file("1")
+key = read_key(KeyPaths.get_grading_key())
 
-from src.grading.check import check, print_all_records_with_ref_scores, print_all_records
+from src.grading.check import check, print_all_records
 
-key = "app-fKyyxey5TrMJg9Y7pWFindBX"
-
-# all_results = check(parsed_path, student_ans_file, key)
-
-# import json
-# json.dump(all_results, open("./results.json", "w"), ensure_ascii=False, indent=4)
-
-# loads
-all_results = json.load(open("./results.json", "r"))
+all_results = check(parsed_path, student_ans_file, key)
 
 md_report = print_all_records(all_results)
 
-with open("report.md", "w") as f:
+with open("report1.md", "w") as f:
     f.write(md_report)

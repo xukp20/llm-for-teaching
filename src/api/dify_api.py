@@ -21,7 +21,6 @@ def completion_messages(inputs, api_key):
         "Content-Type": "application/json",
     }
     response = requests.post(url, json=inputs, headers=headers).json()
-    print(response)
 
     # parse response
     response = response["answer"]

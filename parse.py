@@ -1,14 +1,14 @@
 from src.preprocess.split import split
+from src.utils.paths import FilePaths, KeyPaths, read_key
 
 import os
-base_path = "data/1"
-refs_path = os.path.join(base_path, "refs")
-mids_path = os.path.join(base_path, "mids")
-grading_file = os.path.join(refs_path, "grading_rules.md")
-ref_answer_file = os.path.join(refs_path, "ref_answer.md")
+
+mids_path = FilePaths.get_mids_path("1")
+ref_answer_file = FilePaths.get_ref_answer_file("1")
+grading_file = FilePaths.get_grading_rules_file("1")
 
 # load key for parse_grading_rules from src.configs.keys.parse_grading_rules.txt
-key = open("src/configs/keys/parse_grading_rules.txt", "r").read().strip()
+key = read_key(KeyPaths.get_parse_grading_rules_key())
 
 output_path = os.path.join(mids_path, "problems1.json")
 

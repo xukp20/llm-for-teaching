@@ -13,8 +13,10 @@ def split_raw_text(raw_text):
 
         Split by "### <problem name>" to find the problem name and content after each "###"
     """
+    # strip the things before the first "###"
+    raw_text = "\n" + raw_text[raw_text.find("### "):]
 
-    problems = raw_text.split("### ")[1:]
+    problems = raw_text.split("\n### ")[1:]
     
     # for each, take the first line as the name
     # the rest as the content
