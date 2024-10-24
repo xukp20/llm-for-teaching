@@ -90,12 +90,12 @@ def split(ref_answer_file, grading_file):
     return split_result
 
 
+from src.utils.files import read_student_file
 def split_only_problem(student_ans_file):
     """
         Split the student answer file into separated problems.
     """
-    with open(student_ans_file, "r") as f:
-        student_ans = f.read()
+    student_ans = read_student_file(student_ans_file)
 
     problem_list = split_raw_text(student_ans)
 

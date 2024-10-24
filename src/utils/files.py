@@ -52,6 +52,19 @@ def read_student_file(student_file_path):
                         with z.open(file, "r") as f:
                             content = f.read().decode("utf-8")
                 if content is None:
+                    # try to look for a single dir, and look for md inside it
+                    single_dir = None
+                    for file in z.namelist():
+                        if file.endswith("/"):
+                            if single_dir is not None:
+                                raise ValueError("Multiple directories found in the zip file: " + student_file_path)
+                            single_dir = file
+                    if single_dir is not None:
+                        for file in z.namelist():
+                            if file.startswith(single_dir) and file.endswith(".md"):
+                                with z.open(file, "r") as f:
+                                    content = f.read().decode("utf-8")
+
                     raise ValueError("No .md file found in the zip file: " + student_file_path)
 
         elif student_file_path.endswith(".rar"):
@@ -61,6 +74,19 @@ def read_student_file(student_file_path):
                         with r.open(file, "r") as f:
                             content = f.read().decode("utf-8")
                 if content is None:
+                    # try to look for a single dir, and look for md inside it
+                    single_dir = None
+                    for file in r.namelist():
+                        if file.endswith("/"):
+                            if single_dir is not None:
+                                raise ValueError("Multiple directories found in the rar file: " + student_file_path)
+                            single_dir = file
+                    if single_dir is not None:
+                        for file in r.namelist():
+                            if file.startswith(single_dir) and file.endswith(".md"):
+                                with r.open(file, "r") as f:
+                                    content = f.read().decode("utf-8")
+
                     raise ValueError("No .md file found in the rar file: " + student_file_path)
 
     else:
@@ -84,6 +110,8 @@ if __name__ == "__main__":
             print(f"Error: {e}")
             continue
         
+        print(content[:100])
+        print("\n\n")
         success += 1
 
     print(f"Success: {success}/{len(student_files)}")
